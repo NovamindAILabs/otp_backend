@@ -1,0 +1,7 @@
+express
+nodemailer
+body-parser
+bcryptjs
+dotenv
+@supabase/supabase-js
+ioredis
