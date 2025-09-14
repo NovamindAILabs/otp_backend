@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
+const { createClient } = require('@supabase/supabase-js');
 const { otps } = require('./_shared_otps');
 
 const router = express.Router();
@@ -16,6 +17,9 @@ const transporter = nodemailer.createTransport({
   logger: true, debug: true
 });
 
+// Supabase service client (must use service role key)
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
+
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -27,6 +31,20 @@ router.post('/', async (req, res) => {
   const otp = generateOtp();
   const expiresAt = Date.now() + 5 * 60 * 1000;
   otps.set(email, { otp, expiresAt });
+
+  // Attempt to save OTP into Supabase (debug logs included)
+  try {
+    const row = { email, otp, expires_at: new Date(expiresAt).toISOString(), used: false };
+    const { data: insertData, error: insertError } = await supabase
+      .from(process.env.SUPABASE_OTPS_TABLE || 'otps')
+      .insert([row]);
+
+    console.log('SUPABASE INSERT ERROR ->', insertError);
+    console.log('SUPABASE INSERT DATA ->', insertData);
+  } catch (e) {
+    console.error('Supabase insert exception', e);
+    // continue anyway; email still attempted
+  }
 
   const mail = {
     from: process.env.FROM_EMAIL,
